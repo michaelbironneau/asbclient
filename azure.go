@@ -98,12 +98,14 @@ func (c *Client) DeleteMessage(item *Message) error {
 	if err != nil {
 		return err
 	}
+	
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 
-	defer resp.Body.Close()
+	
 
 	b, _ := ioutil.ReadAll(resp.Body)
 
@@ -125,12 +127,12 @@ func (c *Client) Send(path string, item *Message) error {
 	if err != nil {
 		return err
 	}
+	
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
-
-	defer resp.Body.Close()
 
 	b, _ := ioutil.ReadAll(resp.Body)
 
@@ -152,12 +154,12 @@ func (c *Client) Unlock(item *Message) error {
 	if err != nil {
 		return err
 	}
+	
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
-
-	defer resp.Body.Close()
 
 	b, _ := ioutil.ReadAll(resp.Body)
 
