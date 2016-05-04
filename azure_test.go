@@ -36,7 +36,7 @@ func TestSAS(t *testing.T) {
 	var tu string
 	for testName, testPieces := range testPieces {
 		aq := New(Queue, testPieces.Namespace, testPieces.SAKeyName, testPieces.SAKeyValue)
-		testRequestURI := fmt.Sprintf(serviceBusURL+ testPieces.QueuePath + "/messages/head?timeout=60", aq.namespace)
+		testRequestURI := fmt.Sprintf(serviceBusURL+testPieces.QueuePath+"/messages/head?timeout=60", aq.namespace)
 
 		if tu = aq.signatureURI(testRequestURI); tu != testPieces.URI {
 			t.Errorf("%s expected uri \n %s \n but got \n %s \n", testName, testPieces.URI, tu)

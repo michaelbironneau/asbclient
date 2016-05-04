@@ -20,27 +20,27 @@ import (
 var ErrSubscriptionRequired = fmt.Errorf("A subscription is required for Service Bus Topic operations")
 
 //ClientType denotes the type of client (topic/queue) that is required
-type ClientType int 
+type ClientType int
 
 const (
 	//Queue is a client type for Azure Service Bus queues
-	Queue ClientType = iota 
-	
+	Queue ClientType = iota
+
 	//Topic is a client type for Azure Service Bus topics
 	Topic ClientType = iota
 )
 
-//Client is a client for Azure Service Bus (queues and topics). You should use a different client instance for every namespace. 
+//Client is a client for Azure Service Bus (queues and topics). You should use a different client instance for every namespace.
 //For more comprehensive documentation on its various methods, see:
 //	https://msdn.microsoft.com/en-us/library/azure/hh780717.aspx
 type Client struct {
-	clientType ClientType
-	namespace string
+	clientType   ClientType
+	namespace    string
 	subscription string
-	saKey     string
-	saValue   []byte
-	url       string
-	client    *http.Client
+	saKey        string
+	saValue      []byte
+	url          string
+	client       *http.Client
 }
 
 const serviceBusURL = "https://%s.servicebus.windows.net:443/"
@@ -50,17 +50,17 @@ const serviceBusURL = "https://%s.servicebus.windows.net:443/"
 func New(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) *Client {
 	return &Client{
 		clientType: clientType,
-		namespace: namespace,
-		saKey:     sharedAccessKeyName,
-		saValue:   []byte(sharedAccessKeyValue),
-		url:       fmt.Sprintf(serviceBusURL, namespace),
-		client:    &http.Client{},
+		namespace:  namespace,
+		saKey:      sharedAccessKeyName,
+		saValue:    []byte(sharedAccessKeyValue),
+		url:        fmt.Sprintf(serviceBusURL, namespace),
+		client:     &http.Client{},
 	}
 }
 
 //SetSubscription sets the client's subscription. Only required for Azure Service Bus Topics.
 func (c *Client) SetSubscription(subscription string) {
-	c.subscription = subscription	
+	c.subscription = subscription
 }
 
 func (c *Client) request(url string, method string) (*http.Request, error) {
@@ -87,7 +87,7 @@ func (c *Client) requestWithBody(url string, method string, body []byte) (*http.
 //
 //For more information see https://msdn.microsoft.com/en-us/library/azure/hh780768.aspx.
 func (c *Client) DeleteMessage(item *Message) error {
-	req, err := c.request(item.Location + "/" + item.LockToken, "DELETE")
+	req, err := c.request(item.Location+"/"+item.LockToken, "DELETE")
 
 	if err != nil {
 		return err
@@ -98,14 +98,12 @@ func (c *Client) DeleteMessage(item *Message) error {
 	if err != nil {
 		return err
 	}
-	
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
-
-	
 
 	b, _ := ioutil.ReadAll(resp.Body)
 
@@ -115,8 +113,8 @@ func (c *Client) DeleteMessage(item *Message) error {
 //Send sends a new item to `path`, where `path` is either the queue name or the topic name.
 //
 //For more information see https://msdn.microsoft.com/en-us/library/azure/hh780737.aspx.
-func (c *Client) Send(path string, item *Message) error {	
-	req, err := c.requestWithBody(c.url+ path + "messages/", "POST", item.Body)
+func (c *Client) Send(path string, item *Message) error {
+	req, err := c.requestWithBody(c.url+path+"messages/", "POST", item.Body)
 
 	if err != nil {
 		return err
@@ -127,7 +125,7 @@ func (c *Client) Send(path string, item *Message) error {
 	if err != nil {
 		return err
 	}
-	
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
@@ -154,7 +152,7 @@ func (c *Client) Unlock(item *Message) error {
 	if err != nil {
 		return err
 	}
-	
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
@@ -171,7 +169,7 @@ func (c *Client) Unlock(item *Message) error {
 //If using this with a service bus topic, make sure you SetSubscription() first.
 //For more information see https://msdn.microsoft.com/en-us/library/azure/hh780722.aspx.
 func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
-	var url string 
+	var url string
 	if c.clientType == Queue {
 		url = c.url + path + "/"
 	} else {
@@ -180,7 +178,7 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 		}
 		url = c.url + path + "/subscriptions/" + c.subscription + "/"
 	}
-	req, err := c.request(url+fmt.Sprintf("messages/head?timeout=%d",timeout), "POST")
+	req, err := c.request(url+fmt.Sprintf("messages/head?timeout=%d", timeout), "POST")
 
 	if err != nil {
 		return nil, err
@@ -193,8 +191,12 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 204 {
+		return nil, nil
+	}
+
 	brokerProperties := resp.Header.Get("BrokerProperties")
-	
+
 	location := resp.Header.Get("Location")
 
 	var message Message
@@ -202,14 +204,12 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 	if err := json.Unmarshal([]byte(brokerProperties), &message); err != nil {
 		return nil, fmt.Errorf("Error unmarshalling BrokerProperties: %v", err)
 	}
-	
 
 	mBody, err := ioutil.ReadAll(resp.Body)
-
 	if err != nil {
 		return nil, fmt.Errorf("Error reading message body")
 	}
-	
+
 	message.Location = location
 	message.Body = mBody
 
