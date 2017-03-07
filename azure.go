@@ -114,7 +114,7 @@ func (c *Client) DeleteMessage(item *Message) error {
 //
 //For more information see https://msdn.microsoft.com/en-us/library/azure/hh780737.aspx.
 func (c *Client) Send(path string, item *Message) error {
-	req, err := c.requestWithBody(c.url+path+"messages/", "POST", item.Body)
+	req, err := c.requestWithBody(c.url+path+"/messages/", "POST", item.Body)
 
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (c *Client) Send(path string, item *Message) error {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
 		return nil
 	}
 
