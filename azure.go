@@ -87,7 +87,8 @@ func (c *Client) requestWithBody(url string, method string, body []byte) (*http.
 //
 //For more information see https://msdn.microsoft.com/en-us/library/azure/hh780768.aspx.
 func (c *Client) DeleteMessage(item *Message) error {
-	req, err := c.request(item.Location+"/"+item.LockToken, "DELETE")
+
+	req, err := c.request(item.Location, "DELETE")
 
 	if err != nil {
 		return err
