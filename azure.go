@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -105,6 +106,8 @@ func (c *Client) DeleteMessage(item *Message) error {
 		return err
 	}
 
+	io.Copy(ioutil.Discard, resp.Body)
+
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
@@ -129,6 +132,7 @@ func (c *Client) Send(path string, item *Message) error {
 	}
 
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+		io.Copy(ioutil.Discard, resp.Body)
 		return nil
 	}
 
@@ -152,6 +156,7 @@ func (c *Client) Unlock(item *Message) error {
 	}
 
 	if resp.StatusCode == http.StatusOK {
+		io.Copy(ioutil.Discard, resp.Body)
 		return nil
 	}
 
@@ -184,6 +189,7 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
+		io.Copy(ioutil.Discard, resp.Body)
 		return nil, nil
 	}
 
