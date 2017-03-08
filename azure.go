@@ -44,9 +44,10 @@ type Client struct {
 }
 
 const serviceBusURL = "https://%s.servicebus.windows.net:443/"
+const apiVersion = "2016-07"
 
 //New creates a new client from the given parameters. Their meaning can be found in the MSDN docs at:
-//  https://msdn.microsoft.com/en-us/library/azure/dn798895.aspx
+//  https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
 func New(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) *Client {
 	return &Client{
 		clientType: clientType,
@@ -64,28 +65,32 @@ func (c *Client) SetSubscription(subscription string) {
 }
 
 func (c *Client) request(url string, method string) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", c.authHeader(url, c.signatureExpiry(time.Now())))
-	return req, nil
+	return c.requestWithBody(url, method, nil)
 }
 
-func (c *Client) requestWithBody(url string, method string, body []byte) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+func (c *Client) requestWithBody(urlString string, method string, body []byte) (*http.Request, error) {
+
+	url, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
+	q := url.Query()
+	q.Set("api-version", apiVersion)
+	url.RawQuery = q.Encode()
+
+	req, err := http.NewRequest(method, url.String(), bytes.NewBuffer(body)) // TODO: handle existing query params
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", c.authHeader(url, c.signatureExpiry(time.Now())))
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", c.authHeader(url.String(), c.signatureExpiry(time.Now())))
 	return req, nil
 }
 
 //DeleteMessage deletes the message.
 //
-//For more information see https://msdn.microsoft.com/en-us/library/azure/hh780768.aspx.
+//For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/delete-message.
 func (c *Client) DeleteMessage(item *Message) error {
 
 	req, err := c.request(item.Location, "DELETE")
@@ -100,20 +105,16 @@ func (c *Client) DeleteMessage(item *Message) error {
 		return err
 	}
 
-	defer resp.Body.Close()
-
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 
-	b, _ := ioutil.ReadAll(resp.Body)
-
-	return fmt.Errorf("Got error code %v with body %s", resp.StatusCode, string(b))
+	return readError(resp)
 }
 
 //Send sends a new item to `path`, where `path` is either the queue name or the topic name.
 //
-//For more information see https://msdn.microsoft.com/en-us/library/azure/hh780737.aspx.
+//For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/send-message-to-queue.
 func (c *Client) Send(path string, item *Message) error {
 	req, err := c.requestWithBody(c.url+path+"/messages/", "POST", item.Body)
 
@@ -127,20 +128,16 @@ func (c *Client) Send(path string, item *Message) error {
 		return err
 	}
 
-	defer resp.Body.Close()
-
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
 		return nil
 	}
 
-	b, _ := ioutil.ReadAll(resp.Body)
-
-	return fmt.Errorf("Got error code %v with body %s", resp.StatusCode, string(b))
+	return readError(resp)
 }
 
 //Unlock unlocks a message for processing by other receivers.
 //
-//For more information see https://msdn.microsoft.com/en-us/library/azure/hh780737.aspx.
+//For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/unlock-message.
 func (c *Client) Unlock(item *Message) error {
 	req, err := c.request(item.Location+"/"+item.LockToken, "PUT")
 
@@ -154,21 +151,17 @@ func (c *Client) Unlock(item *Message) error {
 		return err
 	}
 
-	defer resp.Body.Close()
-
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 
-	b, _ := ioutil.ReadAll(resp.Body)
-
-	return fmt.Errorf("Got error code %v with body %s", resp.StatusCode, string(b))
+	return readError(resp)
 }
 
 //PeekLockMessage atomically retrieves and locks the latest message from the queue or topic at `path` (which should not include slashes).
 //
 //If using this with a service bus topic, make sure you SetSubscription() first.
-//For more information see https://msdn.microsoft.com/en-us/library/azure/hh780722.aspx.
+//For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/peek-lock-message-non-destructive-read.
 func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 	var url string
 	if c.clientType == Queue {
@@ -190,10 +183,18 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 204 {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil, nil
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, readError(resp)
+	}
+
+	defer resp.Body.Close()
+	mBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading message body")
 	}
 
 	brokerProperties := resp.Header.Get("BrokerProperties")
@@ -204,11 +205,6 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 
 	if err := json.Unmarshal([]byte(brokerProperties), &message); err != nil {
 		return nil, fmt.Errorf("Error unmarshalling BrokerProperties: %v", err)
-	}
-
-	mBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("Error reading message body")
 	}
 
 	message.Location = location
