@@ -1,5 +1,7 @@
 # Azure Service Bus Client for Go
 
-Client with methods to read and write data from service bus queues and topics.
+Golang client with methods to read and write data from ServiceBus queues and topics using REST.
+
+See: https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
 
 [Godoc](https://godoc.org/github.com/michaelbironneau/asbclient)
