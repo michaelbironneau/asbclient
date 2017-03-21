@@ -34,7 +34,16 @@ const (
 //Client is a client for Azure Service Bus (queues and topics). You should use a different client instance for every namespace.
 //For more comprehensive documentation on its various methods, see:
 //	https://msdn.microsoft.com/en-us/library/azure/hh780717.aspx
-type Client struct {
+type Client interface {
+	DeleteMessage(item *Message) error
+	PeekLockMessage(path string, timeout int) (*Message, error)
+	Send(path string, item *Message) error
+	SetSubscription(subscription string)
+	Unlock(item *Message) error
+}
+
+//client is the default implementation of Client
+type client struct {
 	clientType   ClientType
 	namespace    string
 	subscription string
@@ -49,8 +58,8 @@ const apiVersion = "2016-07"
 
 //New creates a new client from the given parameters. Their meaning can be found in the MSDN docs at:
 //  https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
-func New(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) *Client {
-	return &Client{
+func newClient(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) *client {
+	return &client{
 		clientType: clientType,
 		namespace:  namespace,
 		saKey:      sharedAccessKeyName,
@@ -60,16 +69,22 @@ func New(clientType ClientType, namespace string, sharedAccessKeyName string, sh
 	}
 }
 
+//New creates a new client from the given parameters. Their meaning can be found in the MSDN docs at:
+//  https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
+func New(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) Client {
+	return newClient(clientType, namespace, sharedAccessKeyName, sharedAccessKeyValue)
+}
+
 //SetSubscription sets the client's subscription. Only required for Azure Service Bus Topics.
-func (c *Client) SetSubscription(subscription string) {
+func (c *client) SetSubscription(subscription string) {
 	c.subscription = subscription
 }
 
-func (c *Client) request(url string, method string) (*http.Request, error) {
+func (c *client) request(url string, method string) (*http.Request, error) {
 	return c.requestWithBody(url, method, nil)
 }
 
-func (c *Client) requestWithBody(urlString string, method string, body []byte) (*http.Request, error) {
+func (c *client) requestWithBody(urlString string, method string, body []byte) (*http.Request, error) {
 
 	url, err := url.Parse(urlString)
 	if err != nil {
@@ -92,7 +107,7 @@ func (c *Client) requestWithBody(urlString string, method string, body []byte) (
 //DeleteMessage deletes the message.
 //
 //For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/delete-message.
-func (c *Client) DeleteMessage(item *Message) error {
+func (c *client) DeleteMessage(item *Message) error {
 
 	req, err := c.request(item.Location, "DELETE")
 
@@ -118,7 +133,7 @@ func (c *Client) DeleteMessage(item *Message) error {
 //Send sends a new item to `path`, where `path` is either the queue name or the topic name.
 //
 //For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/send-message-to-queue.
-func (c *Client) Send(path string, item *Message) error {
+func (c *client) Send(path string, item *Message) error {
 	req, err := c.requestWithBody(c.url+path+"/messages/", "POST", item.Body)
 
 	if err != nil {
@@ -142,7 +157,7 @@ func (c *Client) Send(path string, item *Message) error {
 //Unlock unlocks a message for processing by other receivers.
 //
 //For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/unlock-message.
-func (c *Client) Unlock(item *Message) error {
+func (c *client) Unlock(item *Message) error {
 	req, err := c.request(item.Location+"/"+item.LockToken, "PUT")
 
 	if err != nil {
@@ -167,7 +182,7 @@ func (c *Client) Unlock(item *Message) error {
 //
 //If using this with a service bus topic, make sure you SetSubscription() first.
 //For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/peek-lock-message-non-destructive-read.
-func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
+func (c *client) PeekLockMessage(path string, timeout int) (*Message, error) {
 	var url string
 	if c.clientType == Queue {
 		url = c.url + path + "/"
@@ -223,7 +238,7 @@ func (c *Client) PeekLockMessage(path string, timeout int) (*Message, error) {
 //
 //It's translated from the Python client:
 // https://github.com/Azure/azure-sdk-for-python/blob/master/azure-servicebus/azure/servicebus/servicebusservice.py
-func (c *Client) signatureExpiry(from time.Time) string {
+func (c *client) signatureExpiry(from time.Time) string {
 	t := from.Add(300 * time.Second).Round(time.Second).Unix()
 	return strconv.Itoa(int(t))
 }
@@ -232,7 +247,7 @@ func (c *Client) signatureExpiry(from time.Time) string {
 //
 //It's translated from the Python client:
 //https://github.com/Azure/azure-sdk-for-python/blob/master/azure-servicebus/azure/servicebus/servicebusservice.py
-func (c *Client) signatureURI(uri string) string {
+func (c *client) signatureURI(uri string) string {
 	return strings.ToLower(url.QueryEscape(uri)) //Python's urllib.quote and Go's url.QueryEscape behave differently. This might work, or it might not...like everything else to do with authentication in Azure.
 }
 
@@ -240,7 +255,7 @@ func (c *Client) signatureURI(uri string) string {
 //
 //It's translated from the Python client:
 //https://github.com/Azure/azure-sdk-for-python/blob/master/azure-servicebus/azure/servicebus/servicebusservice.py
-func (c *Client) stringToSign(uri string, expiry string) string {
+func (c *client) stringToSign(uri string, expiry string) string {
 	return uri + "\n" + expiry
 }
 
@@ -248,7 +263,7 @@ func (c *Client) stringToSign(uri string, expiry string) string {
 //
 //It's translated from the Python client:
 //https://github.com/Azure/azure-sdk-for-python/blob/master/azure-servicebus/azure/servicebus/_common_conversion.py
-func (c *Client) signString(s string) string {
+func (c *client) signString(s string) string {
 	h := hmac.New(sha256.New, c.saValue)
 	h.Write([]byte(s))
 	encodedSig := base64.StdEncoding.EncodeToString(h.Sum(nil))
@@ -259,7 +274,7 @@ func (c *Client) signString(s string) string {
 //
 //It's translated from the Python client:
 //https://github.com/Azure/azure-sdk-for-python/blob/master/azure-servicebus/azure/servicebus/servicebusservice.py
-func (c *Client) authHeader(uri string, expiry string) string {
+func (c *client) authHeader(uri string, expiry string) string {
 	u := c.signatureURI(uri)
 	s := c.stringToSign(u, expiry)
 	sig := c.signString(s)
