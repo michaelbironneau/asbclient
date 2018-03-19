@@ -21,6 +21,16 @@ type Message struct {
 
 	Location string
 
+  CorrelationID string `json:"CorrelationId,omitempty"`
+  ForcePersistence bool
+  Label string `json:"Label,omitempty"`
+  ReplyTo string `json:"ReplyTo,omitempty"`
+  ReplyToSessionID string `json:ReplyToSessionId,omitempty`
+  ScheduledEnqueueTimeUtc string `json:ScheduledEnqueueTimeUtc,omitempty`
+  SessionID string `json:SessionId,omitempty`
+  To string `json:To,omitempty`
+  ViaPartitionKey string `json:ViaPartitionKey,omitempty`
+
 	Body []byte
 }
 
