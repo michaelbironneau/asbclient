@@ -54,7 +54,7 @@ type client struct {
 }
 
 const serviceBusURL = "https://%s.servicebus.windows.net:443/"
-const apiVersion = "2017-04-01"
+const apiVersion = "2017-04"
 
 //New creates a new client from the given parameters. Their meaning can be found in the MSDN docs at:
 //  https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
