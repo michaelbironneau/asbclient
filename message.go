@@ -7,31 +7,36 @@ import (
 )
 
 //Message is an Azure Service Bus message
+type MessageReq struct {
+  ContentType string `json:",omitempty"`
+  CorrelationId string `json:",omitempty"`
+  SessionID string `json:"SessionId,omitempty"`
+  Label string `json:",omitempty"`
+  ReplyTo string `json:",omitempty"`
+  // TODO: Time span...
+  // TimeToLive string `json:",omitempty"`
+  To string `json:",omitempty"`
+  ScheduledEnqueueTimeUtc Time `json:",omitempty"`
+  ReplyToSessionId string `json:",omitempty"`
+  PartitionKey string `json:",omitempty"`
+
+  Body []byte `json:"-"`
+}
+
 type Message struct {
-	DeliveryCount          int
+  MessageReq
+  DeliveryCount          int
 	EnqueuedSequenceNumber int
 	EnqueuedTimeUtc        Time
 	LockToken              string
 	LockedUntilUtc         Time
 	MessageID              string `json:"MessageId"`
-	PartitionKey           string
 	SequenceNumber         int
 	State                  string
-	TimeToLive             int
-
 	Location string
 
-	CorrelationID           string `json:"CorrelationId,omitempty"`
-	ForcePersistence        bool
-	Label                   string `json:"Label,omitempty"`
-	ReplyTo                 string `json:"ReplyTo,omitempty"`
-	ReplyToSessionID        string `json:ReplyToSessionId,omitempty`
-	ScheduledEnqueueTimeUtc string `json:ScheduledEnqueueTimeUtc,omitempty`
-	SessionID               string `json:SessionId,omitempty`
-	To                      string `json:To,omitempty`
-	ViaPartitionKey         string `json:ViaPartitionKey,omitempty`
+  Body []byte `json:"-"`
 
-	Body []byte
 }
 
 // Time is a wrapper round time.Time to json encode/decode in RFC1123 fomat

@@ -37,7 +37,7 @@ const (
 type Client interface {
 	DeleteMessage(item *Message) error
 	PeekLockMessage(path string, timeout int) (*Message, error)
-	Send(path string, item *Message) error
+	Send(path string, item *MessageReq) error
 	SetSubscription(subscription string)
 	Unlock(item *Message) error
 }
@@ -81,10 +81,10 @@ func (c *client) SetSubscription(subscription string) {
 }
 
 func (c *client) request(url string, method string) (*http.Request, error) {
-	return c.requestWithBody(url, method, nil)
+	return c.requestWithBody(url, method, &MessageReq{})
 }
 
-func (c *client) requestWithBody(urlString string, method string, body []byte) (*http.Request, error) {
+func (c *client) requestWithBody(urlString string, method string, message *MessageReq) (*http.Request, error) {
 
 	url, err := url.Parse(urlString)
 	if err != nil {
@@ -94,13 +94,16 @@ func (c *client) requestWithBody(urlString string, method string, body []byte) (
 	q.Set("api-version", apiVersion)
 	url.RawQuery = q.Encode()
 
-	req, err := http.NewRequest(method, url.String(), bytes.NewBuffer(body)) // TODO: handle existing query params
+	req, err := http.NewRequest(method, url.String(), bytes.NewBuffer(message.Body)) // TODO: handle existing query params
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", c.authHeader(url.String(), c.signatureExpiry(time.Now())))
+  props, _ := json.Marshal(message)
+  req.Header.Set("brokerProperties", string(props))
+
 	return req, nil
 }
 
@@ -133,8 +136,8 @@ func (c *client) DeleteMessage(item *Message) error {
 //Send sends a new item to `path`, where `path` is either the queue name or the topic name.
 //
 //For more information see https://docs.microsoft.com/en-us/rest/api/servicebus/send-message-to-queue.
-func (c *client) Send(path string, item *Message) error {
-	req, err := c.requestWithBody(c.url+path+"/messages/", "POST", item.Body)
+func (c *client) Send(path string, item *MessageReq) error {
+	req, err := c.requestWithBody(c.url+path+"/messages/", "POST", item)
 
 	if err != nil {
 		return err
