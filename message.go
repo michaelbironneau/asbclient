@@ -9,7 +9,7 @@ import (
 //Message is an Azure Service Bus message
 type Message struct {
 	DeliveryCount          int
-	EnqueuedSequenceNumber int
+	EnqueuedSequenceNumber int64
 	EnqueuedTimeUtc        Time
 	LockToken              string
 	LockedUntilUtc         Time
