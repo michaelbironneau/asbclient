@@ -15,7 +15,7 @@ type Message struct {
 	LockedUntilUtc         Time
 	MessageID              string `json:"MessageId"`
 	PartitionKey           string
-	SequenceNumber         int
+	SequenceNumber         int64
 	State                  string
 	TimeToLive             int
 
