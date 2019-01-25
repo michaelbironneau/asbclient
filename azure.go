@@ -58,21 +58,29 @@ const apiVersion = "2016-07"
 
 //New creates a new client from the given parameters. Their meaning can be found in the MSDN docs at:
 //  https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
-func newClient(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) *client {
+func newClient(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string, httpClient *http.Client) *client {
 	return &client{
 		clientType: clientType,
 		namespace:  namespace,
 		saKey:      sharedAccessKeyName,
 		saValue:    []byte(sharedAccessKeyValue),
 		url:        fmt.Sprintf(serviceBusURL, namespace),
-		client:     &http.Client{},
+		client:     httpClient,
 	}
 }
 
 //New creates a new client from the given parameters. Their meaning can be found in the MSDN docs at:
 //  https://docs.microsoft.com/en-us/rest/api/servicebus/Introduction
 func New(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string) Client {
-	return newClient(clientType, namespace, sharedAccessKeyName, sharedAccessKeyValue)
+	return newClient(clientType, namespace, sharedAccessKeyName, sharedAccessKeyValue, &http.Client{})
+}
+
+//NewWithHttpClient creates a new client with a custom http.Client
+func NewWithHttpClient(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string, httpClient *http.client) Client {
+	if httpClient == nil {
+		httpClient = &http.Client{}
+	}
+	return newClient(clientType, namespace, sharedAccessKeyName, sharedAccessKeyValue, httpClient)
 }
 
 //SetSubscription sets the client's subscription. Only required for Azure Service Bus Topics.
