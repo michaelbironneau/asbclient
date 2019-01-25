@@ -76,7 +76,7 @@ func New(clientType ClientType, namespace string, sharedAccessKeyName string, sh
 }
 
 //NewWithHttpClient creates a new client with a custom http.Client
-func NewWithHttpClient(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string, httpClient *http.client) Client {
+func NewWithHttpClient(clientType ClientType, namespace string, sharedAccessKeyName string, sharedAccessKeyValue string, httpClient *http.Client) Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
